@@ -5,6 +5,10 @@ import os
 import click
 
 
+AWS_DEFAULT_CREDS = '~/.aws/credentials'
+if not os.environ['AWS_CRED_FILE']:
+    os.environ['AWS_CRED_FILE'] = AWS_DEFAULT_CREDS
+
 @dataclass
 class AWSProfile:
     profile_name: str
@@ -47,7 +51,7 @@ def build_aws_profile(profile_txt: list[str]) -> AWSProfile:
     return current_profile
 
 
-def get_existing_aws_profiles(creds_file: str = '/Users/vandzhich/.aws/credentials') -> dict[str, AWSProfile]:
+def get_existing_aws_profiles(creds_file: str = os.environ['AWS_CRED_FILE']) -> dict[str, AWSProfile]:
 
     existing_profiles: dict[str, AWSProfile] = {}
     current_profile: Optional[AWSProfile] = None
@@ -80,7 +84,7 @@ def get_aws_profile_from_clipboard() -> AWSProfile:
     return prof
 
 
-def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = '/Users/vandzhich/.aws/credentials', setenv: bool = True) -> None:
+def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = os.environ['AWS_CRED_FILE'], setenv: bool = True) -> None:
     with open(target_path, 'w', encoding='utf-8') as f:
         for p in profiles.values():
             f.writelines(p.dump())
@@ -90,11 +94,12 @@ def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = '/Users/va
 
 @click.command()
 @click.argument('setenv', type=bool, default=True)
-def main(setenv) -> int:
+@click.argument('creds_file', type=str, default=os.environ['AWS_CRED_FILE'])
+def main(setenv: bool, creds_file: str) -> int:
     existing_profiles = get_existing_aws_profiles()
     cb_profile = get_aws_profile_from_clipboard()
     existing_profiles[cb_profile.profile_name] = cb_profile
-    dump_profiles(existing_profiles, './temp_creds.txt')
+    dump_profiles(existing_profiles, creds_file)
     if setenv:
         os.environ['AWS_PROFILE'] = cb_profile.profile_name
 
