@@ -1,3 +1,4 @@
+from __future__ import annotations
 import subprocess
 from dataclasses import dataclass, field
 from typing import Optional
@@ -93,14 +94,14 @@ def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = os.environ
 
 
 @click.command()
-@click.argument('setenv', type=bool, default=True)
+@click.argument('setenv', type=str, default='y')
 @click.argument('creds_file', type=str, default=os.environ['AWS_CRED_FILE'])
 def main(setenv: bool, creds_file: str) -> int:
     existing_profiles = get_existing_aws_profiles()
     cb_profile = get_aws_profile_from_clipboard()
     existing_profiles[cb_profile.profile_name] = cb_profile
     dump_profiles(existing_profiles, creds_file)
-    if setenv:
+    if setenv.lower() in ['y', 'yes']:
         os.environ['AWS_PROFILE'] = cb_profile.profile_name
 
 
