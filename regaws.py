@@ -1,14 +1,16 @@
 from __future__ import annotations
+import argparse
 import subprocess
 from dataclasses import dataclass, field
 from typing import Optional
 import os
-import click
+import argparse
 
 
 AWS_DEFAULT_CREDS = '~/.aws/credentials'
 if not os.environ['AWS_CRED_FILE']:
     os.environ['AWS_CRED_FILE'] = AWS_DEFAULT_CREDS
+
 
 @dataclass
 class AWSProfile:
@@ -85,7 +87,24 @@ def get_aws_profile_from_clipboard() -> AWSProfile:
     return prof
 
 
-def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = os.environ['AWS_CRED_FILE'], setenv: bool = True) -> None:
+def get_aws_profile_from_env() -> AWSProfile:
+    profile_name = 'env_profile'
+    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    aws_session_token = os.environ.get('AWS_SESSION_TOKEN')
+    if not aws_access_key_id or not aws_secret_access_key:
+        raise ValueError(
+            """AWS credentials env vars not configured properly.
+            Make sure both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set.""")
+    return AWSProfile(
+        profile_name=profile_name,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        aws_session_token=aws_session_token
+    )
+
+
+def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = os.environ['AWS_CRED_FILE']) -> None:
     with open(target_path, 'w', encoding='utf-8') as f:
         for p in profiles.values():
             f.writelines(p.dump())
@@ -93,16 +112,42 @@ def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = os.environ
         f.write('\n')
 
 
-@click.command()
-@click.argument('setenv', type=str, default='y')
-@click.argument('creds_file', type=str, default=os.environ['AWS_CRED_FILE'])
-def main(setenv: bool, creds_file: str) -> int:
-    existing_profiles = get_existing_aws_profiles()
-    cb_profile = get_aws_profile_from_clipboard()
-    existing_profiles[cb_profile.profile_name] = cb_profile
-    dump_profiles(existing_profiles, creds_file)
-    if setenv.lower() in ['y', 'yes']:
-        os.environ['AWS_PROFILE'] = cb_profile.profile_name
+def main() -> int:
+    # Create the parser
+    parser = argparse.ArgumentParser(
+        description='Manage profiles in AWS credentials file')
+    parser.add_argument('--creds_file', type=str,
+                        required=False, default=os.environ['AWS_CRED_FILE'])
+
+    # Add the subcommands
+    subparsers = parser.add_subparsers(dest='command')
+
+    # Add the "add" subcommand
+    add_parser = subparsers.add_parser('add', help='Add new profile')
+    add_parser.add_argument(
+        'source', type=str, help='Where to look for the new profile (cb = clipboard)')
+    add_parser.add_argument('--source_file', type=str,
+                            help='The file containing the key')
+    add_parser.add_argument('--set_default', type=str,
+                            default='y', help='Save the added profile as default')
+
+    # Parse the arguments and call the appropriate function
+    args = parser.parse_args()
+    if args.command == 'add':
+        if args.source.lower() in ['cb', 'clipboard']:
+            new_profile = get_aws_profile_from_clipboard()
+        elif args.source.lower() in ['env', 'environment']:
+            new_profile = get_aws_profile_from_env()
+        else:
+            raise ValueError('Unknown profile source')
+
+        if args.set_default.lower() in ['y', 'yes']:
+            new_profile.profile_name = 'default'
+        existing_profiles = get_existing_aws_profiles()
+        existing_profiles[new_profile.profile_name] = new_profile
+        dump_profiles(existing_profiles, args.creds_file)
+
+    return 0
 
 
 if __name__ == '__main__':
