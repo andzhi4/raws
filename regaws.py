@@ -1,5 +1,6 @@
 from __future__ import annotations
 import argparse
+from datetime import datetime
 import subprocess
 from dataclasses import dataclass, field
 from typing import Optional
@@ -74,7 +75,7 @@ def get_existing_aws_profiles(creds_file: str = os.environ['AWS_CRED_FILE']) -> 
 
 def list_profiles() -> str:
     profs = get_existing_aws_profiles()
-    return '\n'.join(list(profs.keys()))
+    return '- '+'\n- '.join(list(profs.keys()))
 
 
 def get_aws_profile_from_clipboard() -> AWSProfile:
@@ -125,12 +126,24 @@ def main() -> int:
     add_parser = subparsers.add_parser('add', help='Add new profile')
     add_parser.add_argument(
         'source', type=str, help='Where to look for the new profile (cb = clipboard)')
-    add_parser.add_argument('--source_file', type=str,
-                            help='The file containing the key')
-    add_parser.add_argument('--set_default', type=str,
-                            default='y', help='Save the added profile as default')
+    add_parser.add_argument('--setdefault', type=str,
+                            default='n', help='Save the added profile as default')
 
+    # Add "list" command
     list_parser = subparsers.add_parser('list', help='Show existing profiles')
+
+    # Add "backup" command
+    backup_parser = subparsers.add_parser(
+        'backup', help='Backup existing profiles')
+    backup_parser.add_argument('--dest', type=str,
+                               default=os.environ['AWS_CRED_FILE'] + '-' + datetime.now().strftime('%Y-%m-%d-%H%M%S') +'.bkp', 
+                               help='Save the added profile as default')
+
+    # Add "delete" command
+    delete_parser =a subparsers.add_parser(
+        'delete', help='Backup existing profiles')
+    delete_parser.add_argument('profile', type=str,
+                               help='Delete profile by name')
 
     # Parse the arguments and call the appropriate function
     args = parser.parse_args()
@@ -142,15 +155,29 @@ def main() -> int:
         else:
             raise ValueError('Unknown profile source')
 
-        if args.set_default.lower() in ['y', 'yes']:
+        if args.setdefault.lower() in ['y', 'yes']:
             new_profile.profile_name = 'default'
         existing_profiles = get_existing_aws_profiles()
         existing_profiles[new_profile.profile_name] = new_profile
         dump_profiles(existing_profiles, args.creds_file)
-        
+
     elif args.command == 'list':
+        print(f'AWS profiles in {args.creds_file}')
         print(list_profiles())
 
+    elif args.command == 'backup':
+        existing_profiles = get_existing_aws_profiles()
+        dump_profiles(existing_profiles, args.dest)
+    
+    elif args.command == 'delete':
+        existing_profiles = get_existing_aws_profiles()
+        if args.profile in existing_profiles:
+            del(existing_profiles[args.profile])
+        else:
+            raise ValueError(f'Profile {args.profile} does not exist')
+        dump_profiles(existing_profiles, args.creds_file)
+
+    
     return 0
 
 
