@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, NoReturn
 import argparse
 import os
 import subprocess
@@ -15,7 +15,7 @@ if not os.environ['AWS_CRED_FILE']:
 class ProfileError(Exception):
     """Exception raised when a profile is not found."""
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(self.message)
 
@@ -23,11 +23,11 @@ class ProfileError(Exception):
 @dataclass
 class AWSProfile:
     profile_name: str
-    aws_access_key_id: str = field(default=None, repr=False, compare=False)
-    aws_secret_access_key: str = field(default=None, repr=False, compare=False)
-    aws_session_token: str = ""
+    aws_access_key_id: Optional[str] = field(default=None, repr=False, compare=False)
+    aws_secret_access_key: Optional[str] = field(default=None, repr=False, compare=False)
+    aws_session_token: Optional[str] = ""
 
-    def dump(self):
+    def dump(self) -> str:
         fields = []
         for f in self.__dataclass_fields__.values():
             name = f.name
@@ -39,7 +39,7 @@ class AWSProfile:
                     fields.append(f"{name}={value}")
         return "\n".join(fields)
 
-    def copy(self):
+    def copy(self) -> AWSProfile:
         return AWSProfile(
             self.profile_name,
             self.aws_access_key_id,
@@ -70,7 +70,7 @@ def get_existing_aws_profiles(creds_file: str = os.environ['AWS_CRED_FILE']) -> 
     current_profile: Optional[AWSProfile] = None
 
     with open(creds_file, 'r', encoding='utf-8') as f:
-        collected_lines = []
+        collected_lines: list[str] = []
         for raw in f:
             line = raw.strip()
             if len(line) > 0:
