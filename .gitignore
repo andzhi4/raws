@@ -1,9 +1,10 @@
 __pycache__
-.pytest_cache
 *.egg-info
 *.pyc
 /.coverage
 /.ipynb*
+/.mypy*
+/.pytest_cache
 /.tox
 build
 temp_*
