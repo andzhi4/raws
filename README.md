@@ -1,5 +1,5 @@
 # Regaws
-
+# TODO: finish readme :)
 REGAWS is a simple AWS Profile Manager with a command-line interface  that helps you quickly add and delete AWS profiles on your local machine.
 
 ## Installation

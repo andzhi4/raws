@@ -19,12 +19,6 @@ class AWSProfile:
     aws_secret_access_key: str = field(default=None, repr=False, compare=False)
     aws_session_token: str = ""
 
-    # def __post_init__(self):
-    #     if self.aws_access_key_id is None:
-    #         raise ValueError("aws_access_key_id is required")
-    #     if self.aws_secret_access_key is None:
-    #         raise ValueError("aws_secret_access_key is required")
-
     def dump(self):
         fields = []
         for field in self.__dataclass_fields__.values():
@@ -76,6 +70,11 @@ def get_existing_aws_profiles(creds_file: str = os.environ['AWS_CRED_FILE']) -> 
         current_profile = build_aws_profile(collected_lines)
         existing_profiles[current_profile.profile_name] = current_profile
         return existing_profiles
+
+
+def list_profiles() -> str:
+    profs = get_existing_aws_profiles()
+    return '\n'.join(list(profs.keys()))
 
 
 def get_aws_profile_from_clipboard() -> AWSProfile:
@@ -131,6 +130,8 @@ def main() -> int:
     add_parser.add_argument('--set_default', type=str,
                             default='y', help='Save the added profile as default')
 
+    list_parser = subparsers.add_parser('list', help='Show existing profiles')
+
     # Parse the arguments and call the appropriate function
     args = parser.parse_args()
     if args.command == 'add':
@@ -146,6 +147,9 @@ def main() -> int:
         existing_profiles = get_existing_aws_profiles()
         existing_profiles[new_profile.profile_name] = new_profile
         dump_profiles(existing_profiles, args.creds_file)
+        
+    elif args.command == 'list':
+        print(list_profiles())
 
     return 0
 
