@@ -13,6 +13,14 @@ if not os.environ['AWS_CRED_FILE']:
     os.environ['AWS_CRED_FILE'] = AWS_DEFAULT_CREDS
 
 
+class ProfileError(Exception):
+    """Exception raised when a profile is not found."""
+
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+
 @dataclass
 class AWSProfile:
     profile_name: str
@@ -160,49 +168,67 @@ def main() -> int:
     setdefault_parser.add_argument('profile', type=str,
                                help='Profile name to make default')
 
+    # Add "setdefault" command
+    setdefault_parser = subparsers.add_parser(
+        'show', help='Show full profile info')
+    setdefault_parser.add_argument('profile', type=str,
+                                   help='Profile name to show')
+
     # Parse the arguments and call the appropriate function
     args = parser.parse_args()
-    if args.command == 'add':
-        if args.source.lower() in ['cb', 'clipboard']:
-            new_profile = get_aws_profile_from_clipboard()
-        elif args.source.lower() in ['env', 'environment']:
-            new_profile = get_aws_profile_from_env()
-        else:
-            raise ValueError('Unknown profile source')
 
-        if args.setdefault.lower() in ['y', 'yes']:
-            new_profile.profile_name = 'default'
-        existing_profiles = get_existing_aws_profiles()
-        existing_profiles[new_profile.profile_name] = new_profile
-        dump_profiles(existing_profiles, args.creds_file)
+    try:
+        if args.command == 'add':
+            if args.source.lower() in ['cb', 'clipboard']:
+                new_profile = get_aws_profile_from_clipboard()
+            elif args.source.lower() in ['env', 'environment']:
+                new_profile = get_aws_profile_from_env()
+            else:
+                raise ValueError('Unknown profile source')
 
-    elif args.command in ('list', 'ls'):
-        print(f'AWS profiles in {args.creds_file}')
-        print(list_profiles())
+            if args.setdefault.lower() in ['y', 'yes']:
+                new_profile.profile_name = 'default'
+            existing_profiles = get_existing_aws_profiles()
+            existing_profiles[new_profile.profile_name] = new_profile
+            dump_profiles(existing_profiles, args.creds_file)
 
-    elif args.command in ('backup', 'bckp'):
-        existing_profiles = get_existing_aws_profiles()
-        dump_profiles(existing_profiles, args.dest)
+        elif args.command in ('list', 'ls'):
+            print(f'AWS profiles in {args.creds_file}')
+            print(list_profiles())
+
+        elif args.command in ('backup', 'bckp'):
+            existing_profiles = get_existing_aws_profiles()
+            dump_profiles(existing_profiles, args.dest)
+        
+        elif args.command in ('delete', 'del'):
+            existing_profiles = get_existing_aws_profiles()
+            if args.profile in existing_profiles:
+                del(existing_profiles[args.profile])
+            else:
+                raise ProfileError(f'Profile {args.profile} does not exist')
+            dump_profiles(existing_profiles, args.creds_file)
+
+        elif args.command in ('setdefault', 'setdef'):
+            existing_profiles = get_existing_aws_profiles()
+            if args.profile in existing_profiles:
+                new_default = existing_profiles[args.profile].copy()
+                new_default.profile_name = 'default'
+                existing_profiles['default'] = new_default
+            else:
+                raise ProfileError(f'Profile {args.profile} does not exist')
+            dump_profiles(existing_profiles, args.creds_file)
+
+        elif args.command in ('show'):
+            existing_profiles = get_existing_aws_profiles()
+            if args.profile in existing_profiles:
+                print(existing_profiles[args.profile].dump())
+            else:
+                raise ProfileError(f'Profile {args.profile} does not exist')
     
-    elif args.command in ('delete', 'del'):
-        existing_profiles = get_existing_aws_profiles()
-        if args.profile in existing_profiles:
-            del(existing_profiles[args.profile])
-        else:
-            raise ValueError(f'Profile {args.profile} does not exist')
-        dump_profiles(existing_profiles, args.creds_file)
+    except ProfileError as e:
+        print(e.message)
+        return 1
 
-    elif args.command in ('setdefault', 'setdef'):
-        existing_profiles = get_existing_aws_profiles()
-        if args.profile in existing_profiles:
-            new_default = existing_profiles[args.profile].copy()
-            new_default.profile_name = 'default'
-            existing_profiles['default'] = new_default
-        else:
-            raise ValueError(f'Profile {args.profile} does not exist')
-        dump_profiles(existing_profiles, args.creds_file)
-
-    
     return 0
 
 
