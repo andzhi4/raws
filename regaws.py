@@ -1,11 +1,10 @@
 from __future__ import annotations
-import argparse
-from datetime import datetime
-import subprocess
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional
-import os
 import argparse
+import os
+import subprocess
 
 
 AWS_DEFAULT_CREDS = '~/.aws/credentials'
@@ -30,8 +29,8 @@ class AWSProfile:
 
     def dump(self):
         fields = []
-        for field in self.__dataclass_fields__.values():
-            name = field.name
+        for f in self.__dataclass_fields__.values():
+            name = f.name
             value = getattr(self, name)
             if value:
                 if name == 'profile_name':
@@ -39,7 +38,7 @@ class AWSProfile:
                 else:
                     fields.append(f"{name}={value}")
         return "\n".join(fields)
-    
+
     def copy(self):
         return AWSProfile(
             self.profile_name,
@@ -57,8 +56,8 @@ def build_aws_profile(profile_txt: list[str]) -> AWSProfile:
             current_profile = AWSProfile(profile_name=profile_name)
         else:
             sep = line.find('=')
-            field_name, field_value = line[:sep].strip(), line[sep+1:].strip()
-            if not 'current_profile' in locals():
+            field_name, field_value = line[:sep].strip(), line[sep + 1:].strip()
+            if 'current_profile' not in locals():
                 raise ValueError(
                     f'Found {field_name} outside of profile definition')
             setattr(current_profile, field_name, field_value)
@@ -91,12 +90,12 @@ def get_existing_aws_profiles(creds_file: str = os.environ['AWS_CRED_FILE']) -> 
 
 def list_profiles() -> str:
     profs = get_existing_aws_profiles()
-    return '- '+'\n- '.join(list(profs.keys()))
+    return '- ' + '\n- '.join(list(profs.keys()))
 
 
 def get_aws_profile_from_clipboard() -> AWSProfile:
     clipboard_text = subprocess.check_output(['pbpaste',]).decode('utf-8')
-    if not 'aws_access_key_id' in clipboard_text:
+    if 'aws_access_key_id' not in clipboard_text:
         raise ValueError('AWS Access Key is not in the clipboard')
     lines = clipboard_text.split('\n')
     prof = build_aws_profile(lines)
@@ -147,13 +146,16 @@ def main() -> int:
                             default='n', help='Save the added profile as default')
 
     # Add "list" command
-    list_parser = subparsers.add_parser('list', aliases=['ls',], help='Show existing profiles')
+    list_parser = subparsers.add_parser(  # noqa: F841
+        'list', aliases=['ls',], help='Show existing profiles')
 
     # Add "backup" command
     backup_parser = subparsers.add_parser(
         'backup', aliases=['bckp'], help='Backup existing profiles')
     backup_parser.add_argument('--dest', type=str,
-                               default=os.environ['AWS_CRED_FILE'] + '-' + datetime.now().strftime('%Y-%m-%d-%H%M%S') +'.bkp', 
+                               default=os.environ['AWS_CRED_FILE'] + '-'
+                               + datetime.now().strftime('%Y-%m-%d-%H%M%S')
+                               + '.bkp',
                                help='Save the added profile as default')
 
     # Add "delete" command
@@ -166,7 +168,7 @@ def main() -> int:
     setdefault_parser = subparsers.add_parser(
         'setdefault', aliases=['setdef',], help='Set given profile as default')
     setdefault_parser.add_argument('profile', type=str,
-                               help='Profile name to make default')
+                                   help='Profile name to make default')
 
     # Add "setdefault" command
     setdefault_parser = subparsers.add_parser(
@@ -199,11 +201,11 @@ def main() -> int:
         elif args.command in ('backup', 'bckp'):
             existing_profiles = get_existing_aws_profiles()
             dump_profiles(existing_profiles, args.dest)
-        
+
         elif args.command in ('delete', 'del'):
             existing_profiles = get_existing_aws_profiles()
             if args.profile in existing_profiles:
-                del(existing_profiles[args.profile])
+                del (existing_profiles[args.profile])
             else:
                 raise ProfileError(f'Profile {args.profile} does not exist')
             dump_profiles(existing_profiles, args.creds_file)
@@ -224,7 +226,7 @@ def main() -> int:
                 print(existing_profiles[args.profile].dump())
             else:
                 raise ProfileError(f'Profile {args.profile} does not exist')
-    
+
     except ProfileError as e:
         print(e.message)
         return 1

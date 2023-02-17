@@ -18,4 +18,4 @@ def test_AWSProfile():
     )
     assert prof.profile_name == 'testprof'
     assert 'aws_secret_access_key' not in prof.__repr__()
-    assert 'aws_secret_access_key' in prof.dump()
+    assert 'aws_secret_access_key' in prof.dump()   
