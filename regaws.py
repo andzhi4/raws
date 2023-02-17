@@ -1,19 +1,22 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, NoReturn
+from typing import Optional
 import argparse
 import os
 import subprocess
 
 
-AWS_DEFAULT_CREDS = '~/.aws/credentials'
-if not os.environ['AWS_CRED_FILE']:
-    os.environ['AWS_CRED_FILE'] = AWS_DEFAULT_CREDS
+# Env variable init to reference the credentials file
+DEFAULT_CREDS_LOCATION = os.path.join(os.path.expanduser('~'), '.aws', 'credentials')
+if 'AWS_CREDS_FILE' not in os.environ\
+        or not os.path.isdir(os.path.dirname(os.environ['AWS_CREDS_FILE'])):
+    # Replace the variable value in the contex of the current process
+    os.environ['AWS_CREDS_FILE'] = DEFAULT_CREDS_LOCATION
 
 
 class ProfileError(Exception):
-    """Exception raised when a profile is not found."""
+    """Exception raised when profile is not found or malformed"""
 
     def __init__(self, message: str) -> None:
         self.message = message
@@ -22,6 +25,15 @@ class ProfileError(Exception):
 
 @dataclass
 class AWSProfile:
+    """
+    Represents a single aws profile comprised of several tokens.
+    Supported methods:
+        dump(): to easily save the profile in a text file.
+        copy(): yields new profile with similar tokens, used to avoid
+                multiple variables binding to a single profile
+    All fields except name are optional since profile might be built gradually,
+    i.e. not all the values determinet at the init time
+    """
     profile_name: str
     aws_access_key_id: Optional[str] = field(default=None, repr=False, compare=False)
     aws_secret_access_key: Optional[str] = field(default=None, repr=False, compare=False)
@@ -48,91 +60,167 @@ class AWSProfile:
         )
 
 
-def build_aws_profile(profile_txt: list[str]) -> AWSProfile:
-    for line in profile_txt:
-        if line.startswith('[') and line.endswith(']'):  # found another profile
-            profile_name = line.strip('[]')
-            # Build new profile object
-            current_profile = AWSProfile(profile_name=profile_name)
+class AWSCredentials():
+    """
+    A class that stores all currently registered AWS profiles
+    and allows basic manipulations on them.
+    Supported methods:
+        __init__: builds a dict of current profiles from a file referenced by
+                  the AWS_CREDS_FILE environment variable (if not set beforehand,
+                  initialized with the default value during the module init)
+
+        setdefault: copy specified profile under 'default' name
+
+        inject_profile: adds new AWSProfile to the self.profiles
+
+        inject_profile_from: adds profile from the clipboard or from a set of
+                             environment variables
+
+        delete_profile: remove given profile from self.profiles
+
+        list: lists all registered profiles
+
+        show: shows detailed representation of a given profile
+
+        save: saves profiles to AWS_CREDS_FILE location, replacing its contents
+
+        backup: create a beckup copy of current AWS_CREDS_FILE in the specified location
+    """
+
+    def __init__(self) -> None:
+        self.profiles = self._get_profiles_from_creds()
+
+    def _build_profile(self, profile_txt: list[str]) -> AWSProfile:
+        for line in profile_txt:
+            if line.startswith('[') and line.endswith(']'):  # found another profile
+                profile_name = line.strip('[]')
+                # Build new profile object
+                current_profile = AWSProfile(profile_name=profile_name)
+            else:
+                sep = line.find('=')
+                field_name, field_value = line[:sep].strip(), line[sep + 1:].strip()
+                if 'current_profile' not in locals():
+                    raise ValueError(
+                        f'Found {field_name} outside of profile definition')
+                setattr(current_profile, field_name, field_value)
+        return current_profile
+
+    def _get_profiles_from_creds(self, creds_file: str = os.environ['AWS_CREDS_FILE']) -> dict[str, AWSProfile]:
+
+        existing_profiles: dict[str, AWSProfile] = {}
+        current_profile: Optional[AWSProfile] = None
+
+        with open(creds_file, 'r', encoding='utf-8') as f:
+            collected_lines: list[str] = []
+            for raw in f:
+                line = raw.strip()
+                if len(line) > 0:
+                    if line.startswith('[') and line.endswith(']'):
+                        if len(collected_lines) > 0:
+                            current_profile = self._build_profile(collected_lines)
+                            existing_profiles[current_profile.profile_name] = current_profile
+                            collected_lines.clear()
+                        collected_lines.append(line)
+                    else:
+                        collected_lines.append(line)
+            # Last profile
+            current_profile = self._build_profile(collected_lines)
+            existing_profiles[current_profile.profile_name] = current_profile
+            return existing_profiles
+
+    def _get_profile_from_clipboard(self) -> AWSProfile:
+        clipboard_text = subprocess.check_output(['pbpaste',]).decode('utf-8')
+        if 'aws_access_key_id' not in clipboard_text:
+            raise ValueError('AWS Access Key is not in the clipboard')
+        lines = clipboard_text.split('\n')
+        prof = self._build_profile(lines)
+        return prof
+
+    def _get_profile_from_env(self) -> AWSProfile:
+        profile_name = 'env_profile'
+        aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = os.environ.get('AWS_SESSION_TOKEN')
+        if not aws_access_key_id or not aws_secret_access_key:
+            raise ValueError(
+                """AWS credentials env vars not configured properly.
+                Make sure both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set.""")
+        return AWSProfile(
+            profile_name=profile_name,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            aws_session_token=aws_session_token
+        )
+
+    def setdefault(self, profile_name: str) -> None:
+        try:
+            new_default = self.profiles[profile_name].copy()
+            new_default.profile_name = 'default'
+            self.profiles['default'] = new_default
+        except KeyError:
+            raise ProfileError(f'Profile {profile_name} does not exist')
+
+    def inject_profile(self, profile: AWSProfile, setdefault: bool = False, strict: bool = False) -> None:
+        if strict and profile.profile_name in self.profiles:
+            raise ProfileError(f'Profile {profile} already exists and strict mode specified')
         else:
-            sep = line.find('=')
-            field_name, field_value = line[:sep].strip(), line[sep + 1:].strip()
-            if 'current_profile' not in locals():
-                raise ValueError(
-                    f'Found {field_name} outside of profile definition')
-            setattr(current_profile, field_name, field_value)
-    return current_profile
+            self.profiles[profile.profile_name] = profile
+        if setdefault:
+            self.setdefault(profile.profile_name)
 
+    def inject_profile_from(self, source: str, setdefault: bool = False, strict: bool = False) -> None:
+        if source.lower() in ('cb', 'clipboard'):
+            new_profile = self._get_profile_from_clipboard()
+        elif source.lower() in ('env', 'environment'):
+            new_profile = self._get_profile_from_env()
+        if strict and new_profile.profile_name in self.profiles:
+            raise ProfileError(f'Profile {new_profile} already exists and strict mode specified')
+        self.profiles[new_profile.profile_name] = new_profile
+        if setdefault:
+            self.setdefault(new_profile.profile_name)
 
-def get_existing_aws_profiles(creds_file: str = os.environ['AWS_CRED_FILE']) -> dict[str, AWSProfile]:
+    def delete_profile(self, profile_name: str) -> None:
+        try:
+            del (self.profiles[profile_name])
+        except KeyError:
+            raise ProfileError(f'Profile {profile_name} does not exist')
 
-    existing_profiles: dict[str, AWSProfile] = {}
-    current_profile: Optional[AWSProfile] = None
+    def list(self) -> str:
+        """List all profiles in the credentials file"""
+        return '- ' + '\n- '.join(list(self.profiles.keys()))
 
-    with open(creds_file, 'r', encoding='utf-8') as f:
-        collected_lines: list[str] = []
-        for raw in f:
-            line = raw.strip()
-            if len(line) > 0:
-                if line.startswith('[') and line.endswith(']'):
-                    if len(collected_lines) > 0:
-                        current_profile = build_aws_profile(collected_lines)
-                        existing_profiles[current_profile.profile_name] = current_profile
-                        collected_lines.clear()
-                    collected_lines.append(line)
-                else:
-                    collected_lines.append(line)
-        # Last profile
-        current_profile = build_aws_profile(collected_lines)
-        existing_profiles[current_profile.profile_name] = current_profile
-        return existing_profiles
+    def show(self, profile_name: str) -> str:
+        """Show details of particular profile from the credentials file"""
+        try:
+            return self.profiles[profile_name].dump()
+        except KeyError:
+            raise ProfileError(f'Profile {profile_name} does not exist')
 
-
-def list_profiles() -> str:
-    profs = get_existing_aws_profiles()
-    return '- ' + '\n- '.join(list(profs.keys()))
-
-
-def get_aws_profile_from_clipboard() -> AWSProfile:
-    clipboard_text = subprocess.check_output(['pbpaste',]).decode('utf-8')
-    if 'aws_access_key_id' not in clipboard_text:
-        raise ValueError('AWS Access Key is not in the clipboard')
-    lines = clipboard_text.split('\n')
-    prof = build_aws_profile(lines)
-    return prof
-
-
-def get_aws_profile_from_env() -> AWSProfile:
-    profile_name = 'env_profile'
-    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
-    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    aws_session_token = os.environ.get('AWS_SESSION_TOKEN')
-    if not aws_access_key_id or not aws_secret_access_key:
-        raise ValueError(
-            """AWS credentials env vars not configured properly.
-            Make sure both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set.""")
-    return AWSProfile(
-        profile_name=profile_name,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-        aws_session_token=aws_session_token
-    )
-
-
-def dump_profiles(profiles: dict[str, AWSProfile], target_path: str = os.environ['AWS_CRED_FILE']) -> None:
-    with open(target_path, 'w', encoding='utf-8') as f:
-        for p in profiles.values():
-            f.writelines(p.dump())
+    def save(self, target_path: str = os.environ['AWS_CREDS_FILE']) -> None:
+        with open(target_path, 'w', encoding='utf-8') as f:
+            for p in self.profiles.values():
+                f.writelines(p.dump())
+                f.write('\n')
             f.write('\n')
-        f.write('\n')
+
+    def backup(self, location: Optional[str] = None) -> None:
+        if not location:
+            cur_path = os.environ['AWS_CREDS_FILE']
+            dt = datetime.now().strftime('%Y-%m-%d-%H%M%S')
+            location = f'{cur_path}-{dt}.bkp'
+        self.save(target_path=location)
+
+    def __repr__(self) -> str:
+        cred_file = os.environ['AWS_CREDS_FILE']
+        return f'<AWSCredentials>, file: {cred_file}\n' + self.list()
 
 
 def main() -> int:
     # Create the parser
     parser = argparse.ArgumentParser(
         description='Manage profiles in AWS credentials file')
-    parser.add_argument('--creds_file', type=str,
-                        required=False, default=os.environ['AWS_CRED_FILE'],
+    parser.add_argument('--creds_location', type=str,
+                        required=False, default=os.environ['AWS_CREDS_FILE'],
                         help='Override AWS Credentials file location')
 
     # Add the subcommands
@@ -152,11 +240,7 @@ def main() -> int:
     # Add "backup" command
     backup_parser = subparsers.add_parser(
         'backup', aliases=['bckp'], help='Backup existing profiles')
-    backup_parser.add_argument('--dest', type=str,
-                               default=os.environ['AWS_CRED_FILE'] + '-'
-                               + datetime.now().strftime('%Y-%m-%d-%H%M%S')
-                               + '.bkp',
-                               help='Save the added profile as default')
+    backup_parser.add_argument('--dest', type=str, default=None)
 
     # Add "delete" command
     delete_parser = subparsers.add_parser(
@@ -170,62 +254,43 @@ def main() -> int:
     setdefault_parser.add_argument('profile', type=str,
                                    help='Profile name to make default')
 
-    # Add "setdefault" command
-    setdefault_parser = subparsers.add_parser(
+    # Add "show" command
+    show_parser = subparsers.add_parser(
         'show', help='Show full profile info')
-    setdefault_parser.add_argument('profile', type=str,
-                                   help='Profile name to show')
+    show_parser.add_argument('profile', type=str,
+                             help='Profile name to show')
 
-    # Parse the arguments and call the appropriate function
+    # Parse the arguments and call the appropriate methods
     args = parser.parse_args()
-
+    local_profiles = AWSCredentials()
     try:
         if args.command == 'add':
+            default = args.setdefault.lower() in ['y', 'yes']
             if args.source.lower() in ['cb', 'clipboard']:
-                new_profile = get_aws_profile_from_clipboard()
+                local_profiles.inject_profile_from(source='cb', setdefault=default)
             elif args.source.lower() in ['env', 'environment']:
-                new_profile = get_aws_profile_from_env()
+                local_profiles.inject_profile_from(source='cb', setdefault=default)
             else:
                 raise ValueError('Unknown profile source')
-
-            if args.setdefault.lower() in ['y', 'yes']:
-                new_profile.profile_name = 'default'
-            existing_profiles = get_existing_aws_profiles()
-            existing_profiles[new_profile.profile_name] = new_profile
-            dump_profiles(existing_profiles, args.creds_file)
+            local_profiles.save()
 
         elif args.command in ('list', 'ls'):
-            print(f'AWS profiles in {args.creds_file}')
-            print(list_profiles())
+            print(f'AWS profiles in {args.creds_location}')
+            print(local_profiles.list())
 
         elif args.command in ('backup', 'bckp'):
-            existing_profiles = get_existing_aws_profiles()
-            dump_profiles(existing_profiles, args.dest)
+            local_profiles.backup(args.dest)
 
         elif args.command in ('delete', 'del'):
-            existing_profiles = get_existing_aws_profiles()
-            if args.profile in existing_profiles:
-                del (existing_profiles[args.profile])
-            else:
-                raise ProfileError(f'Profile {args.profile} does not exist')
-            dump_profiles(existing_profiles, args.creds_file)
+            local_profiles.delete_profile(args.profile)
+            local_profiles.save()
 
         elif args.command in ('setdefault', 'setdef'):
-            existing_profiles = get_existing_aws_profiles()
-            if args.profile in existing_profiles:
-                new_default = existing_profiles[args.profile].copy()
-                new_default.profile_name = 'default'
-                existing_profiles['default'] = new_default
-            else:
-                raise ProfileError(f'Profile {args.profile} does not exist')
-            dump_profiles(existing_profiles, args.creds_file)
+            local_profiles.setdefault(args.profile)
+            local_profiles.save()
 
         elif args.command in ('show'):
-            existing_profiles = get_existing_aws_profiles()
-            if args.profile in existing_profiles:
-                print(existing_profiles[args.profile].dump())
-            else:
-                raise ProfileError(f'Profile {args.profile} does not exist')
+            print(local_profiles.show(args.profile))
 
     except ProfileError as e:
         print(e.message)
