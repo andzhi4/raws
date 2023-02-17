@@ -31,6 +31,14 @@ class AWSProfile:
                 else:
                     fields.append(f"{name}={value}")
         return "\n".join(fields)
+    
+    def copy(self):
+        return AWSProfile(
+            self.profile_name,
+            self.aws_access_key_id,
+            self.aws_secret_access_key,
+            self.aws_session_token
+        )
 
 
 def build_aws_profile(profile_txt: list[str]) -> AWSProfile:
@@ -117,7 +125,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description='Manage profiles in AWS credentials file')
     parser.add_argument('--creds_file', type=str,
-                        required=False, default=os.environ['AWS_CRED_FILE'])
+                        required=False, default=os.environ['AWS_CRED_FILE'],
+                        help='Override AWS Credentials file location')
 
     # Add the subcommands
     subparsers = parser.add_subparsers(dest='command')
@@ -130,20 +139,26 @@ def main() -> int:
                             default='n', help='Save the added profile as default')
 
     # Add "list" command
-    list_parser = subparsers.add_parser('list', help='Show existing profiles')
+    list_parser = subparsers.add_parser('list', aliases=['ls',], help='Show existing profiles')
 
     # Add "backup" command
     backup_parser = subparsers.add_parser(
-        'backup', help='Backup existing profiles')
+        'backup', aliases=['bckp'], help='Backup existing profiles')
     backup_parser.add_argument('--dest', type=str,
                                default=os.environ['AWS_CRED_FILE'] + '-' + datetime.now().strftime('%Y-%m-%d-%H%M%S') +'.bkp', 
                                help='Save the added profile as default')
 
     # Add "delete" command
-    delete_parser =a subparsers.add_parser(
-        'delete', help='Backup existing profiles')
+    delete_parser = subparsers.add_parser(
+        'delete', aliases=['del'], help='Backup existing profiles')
     delete_parser.add_argument('profile', type=str,
                                help='Delete profile by name')
+
+    # Add "setdefault" command
+    setdefault_parser = subparsers.add_parser(
+        'setdefault', aliases=['setdef',], help='Set given profile as default')
+    setdefault_parser.add_argument('profile', type=str,
+                               help='Profile name to make default')
 
     # Parse the arguments and call the appropriate function
     args = parser.parse_args()
@@ -161,18 +176,28 @@ def main() -> int:
         existing_profiles[new_profile.profile_name] = new_profile
         dump_profiles(existing_profiles, args.creds_file)
 
-    elif args.command == 'list':
+    elif args.command in ('list', 'ls'):
         print(f'AWS profiles in {args.creds_file}')
         print(list_profiles())
 
-    elif args.command == 'backup':
+    elif args.command in ('backup', 'bckp'):
         existing_profiles = get_existing_aws_profiles()
         dump_profiles(existing_profiles, args.dest)
     
-    elif args.command == 'delete':
+    elif args.command in ('delete', 'del'):
         existing_profiles = get_existing_aws_profiles()
         if args.profile in existing_profiles:
             del(existing_profiles[args.profile])
+        else:
+            raise ValueError(f'Profile {args.profile} does not exist')
+        dump_profiles(existing_profiles, args.creds_file)
+
+    elif args.command in ('setdefault', 'setdef'):
+        existing_profiles = get_existing_aws_profiles()
+        if args.profile in existing_profiles:
+            new_default = existing_profiles[args.profile].copy()
+            new_default.profile_name = 'default'
+            existing_profiles['default'] = new_default
         else:
             raise ValueError(f'Profile {args.profile} does not exist')
         dump_profiles(existing_profiles, args.creds_file)
