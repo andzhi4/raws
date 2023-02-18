@@ -189,11 +189,7 @@ class AWSCredentials():
             new_profile = self._get_profile_from_clipboard()
         elif source.lower() in ('env', 'environment'):
             new_profile = self._get_profile_from_env()
-        if strict and new_profile.profile_name in self.profiles:
-            raise ProfileError(f'Profile {new_profile} already exists and strict mode specified')
-        self.profiles[new_profile.profile_name] = new_profile
-        if setdefault:
-            self.setdefault(new_profile.profile_name)
+        self.inject_profile(new_profile, setdefault=setdefault, strict=strict)
         return new_profile.profile_name
 
     def delete_profile(self, profile_name: str) -> str:
