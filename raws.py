@@ -184,11 +184,13 @@ class AWSCredentials():
         if setdefault:
             self.setdefault(profile.profile_name)
 
-    def inject_profile_from(self, source: str, setdefault: bool = False, strict: bool = False) -> str:
+    def inject_profile_from(self, source: str, setdefault: bool = False, strict: bool = False, rename_to: str = None) -> str:
         if source.lower() in ('cb', 'clipboard'):
             new_profile = self._get_profile_from_clipboard()
         elif source.lower() in ('env', 'environment'):
             new_profile = self._get_profile_from_env()
+        if rename_to:
+            new_profile.profile_name = rename_to
         self.inject_profile(new_profile, setdefault=setdefault, strict=strict)
         return new_profile.profile_name
 
@@ -280,6 +282,8 @@ def main() -> int:
         'source', type=str, help='Where to look for the new profile (cb = clipboard)')
     add_parser.add_argument('--setdefault', action='store_true',
                             help='Save the added profile as default')
+    add_parser.add_argument('--rename_to', type=str, default=None,
+                            help='Rename new profile')
 
     # Add "list" command
     list_parser = subparsers.add_parser(  # noqa: F841
@@ -332,7 +336,8 @@ def main() -> int:
             try:
                 sources_map = {'cb': 'cb', 'clipboard': 'cb', 'env': 'env', 'environment': 'env'}
                 source = sources_map[args.source.lower()]
-                new_profile = local_profiles.inject_profile_from(source=source, setdefault=args.setdefault)
+                new_profile = local_profiles.inject_profile_from(
+                    source=source, setdefault=args.setdefault, rename_to=args.rename_to)
             except KeyError:
                 raise ProfileError('Unknown profile source')
             local_profiles.save()
