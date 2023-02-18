@@ -100,6 +100,9 @@ class AWSCredentials():
     def __contains__(self, item: str) -> bool:
         return item in self.profiles
 
+    def __getitem__(self, item: str) -> AWSProfile:
+        return self.profiles['item']
+
     def _build_profile(self, profile_txt: list[str]) -> AWSProfile:
         for line in profile_txt:
             if line.startswith('[') and line.endswith(']'):  # found another profile
@@ -253,6 +256,13 @@ class AWSCredentials():
         shutil.copy(backup_file, self.creds_file)
         return backup_file
 
+    def rename(self, from_: str, to_: str) -> str:
+        try:
+            self.profiles[from_].profile_name = to_
+        except KeyError:
+            raise ProfileError(f'Profile {from_} does not exist')
+        return f'{from_} -> {to_}'
+
     def __repr__(self) -> str:
         return self.list()
 
@@ -263,7 +273,7 @@ def main() -> int:
         description='Manage profiles in AWS credentials file')
     parser.add_argument('--creds_file', type=str,
                         required=False, default=os.environ['AWS_CREDS_FILE'],
-                        help='Override AWS Credentials file location')
+                        help='Override credentials file location')
 
     # Add the subcommands
     subparsers = parser.add_subparsers(dest='command')
@@ -299,7 +309,7 @@ def main() -> int:
 
     # Add "setdefault" command
     setdefault_parser = subparsers.add_parser(
-        '--setdefault', aliases=['setdef'], help='Set given profile as default')
+        'setdefault', aliases=['setdef'], help='Set given profile as default')
     setdefault_parser.add_argument('profile', type=str,
                                    help='Profile name to make default')
 
@@ -310,8 +320,13 @@ def main() -> int:
                              help='Profile name to show')
 
     # Add "showfile" command
-    show_parser = subparsers.add_parser(
+    showfile_parser = subparsers.add_parser(  # noqa: F841
         'showfile', aliases=['file',], help='Show current credentials file')
+
+    # Add "rename" command
+    rename_parser = subparsers.add_parser('rename', help='rename a profile')
+    rename_parser.add_argument('from_', type=str, help='Source profile name')
+    rename_parser.add_argument('to_', type=str, help='Target profile name')
 
     # Parse the arguments and call the appropriate methods
     args = parser.parse_args()
@@ -353,6 +368,11 @@ def main() -> int:
 
         elif args.command in ('showfile', 'file'):
             print(local_profiles.creds_file)
+
+        elif args.command in ('rename'):
+            result = local_profiles.rename(args.from_, args.to_)
+            local_profiles.save()
+            print(f'Renamed: {result}')
 
     except ProfileError as e:
         print(e.message)
