@@ -181,7 +181,7 @@ class AWSCredentials():
         if setdefault:
             self.setdefault(profile.profile_name)
 
-    def inject_profile_from(self, source: str, setdefault: bool = False, strict: bool = False) -> None:
+    def inject_profile_from(self, source: str, setdefault: bool = False, strict: bool = False) -> str:
         if source.lower() in ('cb', 'clipboard'):
             new_profile = self._get_profile_from_clipboard()
         elif source.lower() in ('env', 'environment'):
@@ -191,6 +191,7 @@ class AWSCredentials():
         self.profiles[new_profile.profile_name] = new_profile
         if setdefault:
             self.setdefault(new_profile.profile_name)
+        return new_profile.profile_name
 
     def delete_profile(self, profile_name: str) -> str:
         try:
@@ -271,8 +272,8 @@ def main() -> int:
     add_parser = subparsers.add_parser('add', help='Add new profile')
     add_parser.add_argument(
         'source', type=str, help='Where to look for the new profile (cb = clipboard)')
-    add_parser.add_argument('--setdefault', type=str,
-                            default='n', help='Save the added profile as default')
+    add_parser.add_argument('--setdefault', action='store_true',
+                            help='Save the added profile as default')
 
     # Add "list" command
     list_parser = subparsers.add_parser(  # noqa: F841
@@ -298,7 +299,7 @@ def main() -> int:
 
     # Add "setdefault" command
     setdefault_parser = subparsers.add_parser(
-        'setdefault', aliases=['setdef',], help='Set given profile as default')
+        '--setdefault', aliases=['setdef'], help='Set given profile as default')
     setdefault_parser.add_argument('profile', type=str,
                                    help='Profile name to make default')
 
@@ -317,14 +318,14 @@ def main() -> int:
     local_profiles = AWSCredentials(args.creds_file)
     try:
         if args.command == 'add':
-            default = args.setdefault.lower() in ['y', 'yes']
-            if args.source.lower() in ['cb', 'clipboard']:
-                local_profiles.inject_profile_from(source='cb', setdefault=default)
-            elif args.source.lower() in ['env', 'environment']:
-                local_profiles.inject_profile_from(source='cb', setdefault=default)
-            else:
-                raise ValueError('Unknown profile source')
+            try:
+                sources_map = {'cb': 'cb', 'clipboard': 'cb', 'env': 'env', 'environment': 'env'}
+                source = sources_map[args.source.lower()]
+                new_profile = local_profiles.inject_profile_from(source=source, setdefault=args.setdefault)
+            except KeyError:
+                raise ProfileError('Unknown profile source')
             local_profiles.save()
+            print(f'Added new profile: {new_profile}')
 
         elif args.command in ('list', 'ls'):
             print(local_profiles.list())
