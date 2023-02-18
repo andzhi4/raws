@@ -101,7 +101,7 @@ class AWSCredentials():
         return item in self.profiles
 
     def __getitem__(self, item: str) -> AWSProfile:
-        return self.profiles['item']
+        return self.profiles[item]
     
     def __len__(self):
         return len(self.profiles)

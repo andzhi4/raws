@@ -1,10 +1,10 @@
-import pytest
-import os
-import shutil
 from raws import AWSProfile, AWSCredentials
+import os
+import pytest
+import shutil
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def sample_creds_file(tmp_path_factory):
     temp_dir = tmp_path_factory.mktemp("data")
     test_creds_path = os.path.join(os.getcwd(), 'tests', 'raws_test_sample_prof.txt')
@@ -19,7 +19,17 @@ def sample_creds(sample_creds_file):
 
 
 def test_AWSProfile_profile_name(sample_creds):
-    assert sample_creds.profiles['some-funny-guy'].profile_name == 'some-funny-guy'
+    assert sample_creds['some-funny-guy'].profile_name == 'some-funny-guy'
+
+
+def test_AWSProfile_profile_dump(sample_creds):
+    dumped = sample_creds['some-funny-guy'].dump()
+    assert '[some-funny-guy]' in dumped
+
+
+def test_AWSProfile_profile_copy(sample_creds):
+    new_prof = sample_creds['some-funny-guy'].copy()
+    assert new_prof.profile_name == 'some-funny-guy'
 
 
 def test_AWSCredentials_inject_profile(sample_creds):
@@ -89,3 +99,11 @@ def test_AWSCredentials_restore(sample_creds, sample_creds_file):
 def test_AWSCredentials_rename(sample_creds):
     result = sample_creds.rename('some-funny-guy', 'renamed_profile')
     assert 'renamed_profile' in sample_creds
+
+
+def test_AWSCredentials_dunder(sample_creds):
+    assert len(sample_creds) == 1
+    assert sample_creds['some-funny-guy'].profile_name == 'some-funny-guy'
+    assert 'some-funny-guy' in sample_creds
+
+# TODO: add tests for the CLI part
