@@ -1,13 +1,17 @@
 # RAWS
 
 RAWS is a simple AWS Profile Manager with a command-line interface that helps you easily manipulate AWS profiles on your local machine.
-RAWS will lookup location of your AWS credentials file through environment variable `AWS_CREDS_FILE`. If the variable is not set, it will default to '~/.aws/credentials'. You can also override the file location by specifing --creds_file argument.
+RAWS will lookup location of your AWS credentials file through environment variable `AWS_CREDS_FILE`. If the variable is not set, it will default to `~/.aws/credentials`. You can also override the file location by specifing `--creds_file` argument.
 
 ## Installation
 
 You can install the raws by cloning the repository and running pip install:
-`cd raws && pip install .`
-TODO: publish on PyPi
+```shell
+git clone git@github.com:andzhi4/raws
+cd raws && pip install .
+```
+
+Installation trough PyPi is on the way
 
 This will display a list of available commands:
 `raws -h`
@@ -28,28 +32,48 @@ This will display a list of available commands:
 Here are a few examples of how to use the AWS Profile Manager:
 
 Show all available profiles:
-`raws list or raws ls`
+```shell
+raws list 
+```
+or
+```shell
+raws ls
+```
 
-Show details of `personal` profile:
-`raws show personal`
+Show details of the `personal` profile:
+```shell
+raws show personal
+```
 
-Add a new profile from clipboard (copied from AWS SSO page):
-`raws add cb --setdefault --rename_to=personal`
+Add a new profile from clipboard (copied from AWS SSO page), set as default, rename to `personal`:
+```shell
+raws add cb --setdefault --rename_to=personal
+```
 
 Rename profile `busieness_13123` to `work`:
-`raws rename busieness_13123 work`
+```shell
+raws rename busieness_13123 work
+```
 
 Set `personal` profile as default:
-`raws setdef personal`
+```shell
+raws setdef personal
+```
 
 Backup current credentials file:
-`raws backup`
+```shell
+raws backup
+```
 
 Restore from the latest backup:
-`raws restore --latest`
+```shell
+raws restore --latest
+```
 
 List all profiles in a backup file located in /home/user/backup/creds.bkp
-`raws --creds_file=/home/user/backup/creds.bkp ls`
+```shell
+raws --creds_file=/home/user/backup/creds.bkp ls
+```
 
 ## Contributing
 
