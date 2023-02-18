@@ -8,7 +8,11 @@ import argparse
 import os
 import subprocess
 
-
+"""
+A simple tool for AWS profiles management
+TODO: add .aws/config manipulation:
+        raws config <profile> <option> <value>
+"""
 # Env variable init to reference the credentials file
 DEFAULT_CREDS_LOCATION = os.path.join(os.path.expanduser('~'), '.aws', 'credentials')
 if 'AWS_CREDS_FILE' not in os.environ\
@@ -112,7 +116,6 @@ class AWSCredentials():
         return current_profile
 
     def _get_profiles_from_creds(self) -> dict[str, AWSProfile]:
-        print(f'reading creds from: {self.creds_file}')
 
         existing_profiles: dict[str, AWSProfile] = {}
         current_profile: Optional[AWSProfile] = None
@@ -159,13 +162,16 @@ class AWSCredentials():
             aws_session_token=aws_session_token
         )
 
-    def setdefault(self, profile_name: str) -> None:
+    def setdefault(self, profile_name: str) -> str:
+        if profile_name.lower() == 'default':
+            raise ProfileError('Specified profile is already a default')
         try:
             new_default = self.profiles[profile_name].copy()
             new_default.profile_name = 'default'
             self.profiles['default'] = new_default
         except KeyError:
             raise ProfileError(f'Profile {profile_name} does not exist')
+        return profile_name
 
     def inject_profile(self, profile: AWSProfile, setdefault: bool = False, strict: bool = False) -> None:
         if strict and profile.profile_name in self.profiles:
@@ -186,11 +192,12 @@ class AWSCredentials():
         if setdefault:
             self.setdefault(new_profile.profile_name)
 
-    def delete_profile(self, profile_name: str) -> None:
+    def delete_profile(self, profile_name: str) -> str:
         try:
             del (self.profiles[profile_name])
         except KeyError:
             raise ProfileError(f'Profile {profile_name} does not exist')
+        return profile_name
 
     def list(self) -> str:
         """List all profiles in the credentials file"""
@@ -221,7 +228,7 @@ class AWSCredentials():
         self.save(target_path=target_path)
         return target_path
 
-    def restore(self, latest:bool = True, backup_path: Optional[str] = None) -> None:
+    def restore(self, latest: bool = True, backup_path: Optional[str] = None) -> str:
         """
         Restore the latest backup or a backup from a specific file
         Note: latest will only work correctly if the backup is in the same
@@ -238,13 +245,15 @@ class AWSCredentials():
                     found_backups.append(file)
             fname = sorted(found_backups, reverse=True)[0]
             backup_file = os.path.join(creds_dir, fname)
-        else:
+        elif backup_path:
             backup_file = backup_path
+        else:
+            raise ValueError('Neither --latest option, nor backup location specified')
         shutil.copy(backup_file, self.creds_file)
+        return backup_file
 
     def __repr__(self) -> str:
-        cred_file = self.creds_file
-        return f'<AWSCredentials>, file: {cred_file}\n' + self.list()
+        return self.list()
 
 
 def main() -> int:
@@ -299,6 +308,10 @@ def main() -> int:
     show_parser.add_argument('profile', type=str,
                              help='Profile name to show')
 
+    # Add "showfile" command
+    show_parser = subparsers.add_parser(
+        'showfile', aliases=['file',], help='Show current credentials file')
+
     # Parse the arguments and call the appropriate methods
     args = parser.parse_args()
     local_profiles = AWSCredentials(args.creds_file)
@@ -318,21 +331,27 @@ def main() -> int:
 
         elif args.command in ('backup', 'bckp'):
             backup_path = local_profiles.backup(args.dest)
-            print(backup_path)
-        
-        elif args.command in ('restore'): # not implemented
-            local_profiles.restore(latest=args.latest, backup_path=args.dest)
+            print(f'AWS profiles backed up to: {backup_path}')
+
+        elif args.command in ('restore'):  # not implemented
+            restored_from = local_profiles.restore(latest=args.latest, backup_path=args.dest)
+            print(f'AWS profiles restored from: {restored_from}')
 
         elif args.command in ('delete', 'del'):
-            local_profiles.delete_profile(args.profile)
+            deleted_profile = local_profiles.delete_profile(args.profile)
             local_profiles.save()
+            print(f'Deleted profile: {deleted_profile}')
 
         elif args.command in ('setdefault', 'setdef'):
-            local_profiles.setdefault(args.profile)
+            default_prof = local_profiles.setdefault(args.profile)
             local_profiles.save()
+            print(f'{default_prof} is set as default')
 
         elif args.command in ('show'):
             print(local_profiles.show(args.profile))
+
+        elif args.command in ('showfile', 'file'):
+            print(local_profiles.creds_file)
 
     except ProfileError as e:
         print(e.message)

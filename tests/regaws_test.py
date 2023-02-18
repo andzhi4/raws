@@ -1,11 +1,11 @@
 import pytest
 import os
-from regaws import AWSProfile, AWSCredentials
+from raws import AWSProfile, AWSCredentials
 
 
 @pytest.fixture(scope='session')
 def sample_creds():
-    tmp_creds_path = os.path.join(os.getcwd(), 'tests', 'regaws_test_sample_prof.txt')
+    tmp_creds_path = os.path.join(os.getcwd(), 'tests', 'raws_test_sample_prof.txt')
     prof = AWSCredentials(tmp_creds_path)
     return prof
 
