@@ -1,21 +1,25 @@
 import pytest
-from regaws import AWSProfile, build_aws_profile
+import os
+from regaws import AWSProfile, AWSCredentials
 
-@pytest.fixture()
-def sample_aws_profile():
-    with open('regaws_test_sample_prof.txt', 'r', encoding='utf-8') as f:
-        data = f.read()
-    prof = build_aws_profile(data)
+
+@pytest.fixture(scope='session')
+def sample_creds():
+    tmp_creds_path = os.path.join(os.getcwd(), 'tests', 'regaws_test_sample_prof.txt')
+    prof = AWSCredentials(tmp_creds_path)
     return prof
 
 
-def test_AWSProfile():
-    prof = AWSProfile(
-        profile_name='testprof',
-        aws_access_key_id='DEADBEEFDEADBEEF',
-        aws_secret_access_key='huuhbabuba',
-        aws_session_token='imagonnaexplode===='
+def test_AWSProfile_profile_name(sample_creds):
+    assert sample_creds.profiles['274516845231_some-funny-guy'].profile_name == '274516845231_some-funny-guy'
+
+def test_AWSCredentials_inject(sample_creds):
+    new_profile = AWSProfile(
+        profile_name='test_prof',
+        aws_access_key_id='deadbeef',
+        aws_secret_access_key='hababuba===2342',
     )
-    assert prof.profile_name == 'testprof'
-    assert 'aws_secret_access_key' not in prof.__repr__()
-    assert 'aws_secret_access_key' in prof.dump()   
+    sample_creds.inject_profile(new_profile)
+    assert 'test_prof' in sample_creds
+
+
