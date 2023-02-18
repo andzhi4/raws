@@ -90,7 +90,7 @@ class AWSCredentials():
 
         save: saves profiles to AWS_CREDS_FILE location, replacing its contents
 
-        backup: create a beckup copy of current AWS_CREDS_FILE in the specified location
+        backup: create a backup copy of current AWS_CREDS_FILE in the specified location
     """
 
     def __init__(self, creds_file: str = os.environ['AWS_CREDS_FILE']) -> None:
@@ -102,6 +102,9 @@ class AWSCredentials():
 
     def __getitem__(self, item: str) -> AWSProfile:
         return self.profiles['item']
+    
+    def __len__(self):
+        return len(self.profiles)
 
     def _build_profile(self, profile_txt: list[str]) -> AWSProfile:
         for line in profile_txt:
@@ -255,11 +258,17 @@ class AWSCredentials():
         return backup_file
 
     def rename(self, from_: str, to_: str) -> str:
-        try:
-            self.profiles[from_].profile_name = to_
-        except KeyError:
-            raise ProfileError(f'Profile {from_} does not exist')
-        return f'{from_} -> {to_}'
+        if from_ != to_:
+            try:
+                tmp_profile = self.profiles[from_]
+                tmp_profile.profile_name = to_
+                self.inject_profile(tmp_profile, strict=True)
+                self.delete_profile(from_)
+            except KeyError:
+                raise ProfileError(f'Profile {from_} does not exist')
+            return f'{from_} -> {to_}'
+        else:
+            raise ProfileError('Same name provided, nothing to rename')
 
     def __repr__(self) -> str:
         return self.list()
