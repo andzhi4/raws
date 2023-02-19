@@ -36,7 +36,7 @@ jobs:
     
     - name: Typecheck with mypy
       run: |
-          mypy raws  # TODO: remove hardcoded module name
+          mypy raws.py  # TODO: remove hardcoded module name
     - name: Test with pytest
       run: |
         pytest

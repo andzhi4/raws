@@ -102,8 +102,8 @@ class AWSCredentials():
 
     def __getitem__(self, item: str) -> AWSProfile:
         return self.profiles[item]
-    
-    def __len__(self):
+
+    def __len__(self) -> int:
         return len(self.profiles)
 
     def _build_profile(self, profile_txt: list[str]) -> AWSProfile:
@@ -187,7 +187,10 @@ class AWSCredentials():
         if setdefault:
             self.setdefault(profile.profile_name)
 
-    def inject_profile_from(self, source: str, setdefault: bool = False, strict: bool = False, rename_to: str = None) -> str:
+    def inject_profile_from(self, source: str,
+                            setdefault: bool = False,
+                            strict: bool = False,
+                            rename_to: Optional[str] = None) -> str:
         if source.lower() in ('cb', 'clipboard'):
             new_profile = self._get_profile_from_clipboard()
         elif source.lower() in ('env', 'environment'):
@@ -389,6 +392,7 @@ def main() -> int:
         return 1
 
     return 0
+
 
 # TODO: validate_profile() method to check whether the passed text is valid AWS profile
 # TODO: implement __setattr__()

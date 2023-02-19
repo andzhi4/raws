@@ -44,7 +44,7 @@ def test_AWSCredentials_inject_profile(sample_creds):
 
 def test_AWSCredentials_setdefautl(sample_creds):
     new_default = sample_creds.setdefault('some-funny-guy')
-    assert 'default' in sample_creds
+    assert new_default in sample_creds
     assert sample_creds.profiles['default'].aws_access_key_id == 'ASIAT733AJAOEMDAGJHK'
 
 
@@ -97,7 +97,7 @@ def test_AWSCredentials_restore(sample_creds, sample_creds_file):
 
 
 def test_AWSCredentials_rename(sample_creds):
-    result = sample_creds.rename('some-funny-guy', 'renamed_profile')
+    _ = sample_creds.rename('some-funny-guy', 'renamed_profile')
     assert 'renamed_profile' in sample_creds
 
 
