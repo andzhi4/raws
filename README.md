@@ -1,3 +1,4 @@
+[![build status](https://github.com/andzhi4/raws/actions/workflows/matrix-test.yml/badge.svg)](https://github.com/andzhi4/raws/actions/workflows/matrix-test.yml)
 # RAWS
 
 RAWS is a simple AWS Profile Manager with a command-line interface that helps you easily manipulate AWS profiles on your local machine.
