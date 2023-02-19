@@ -390,6 +390,7 @@ def main() -> int:
 
     return 0
 
-
+# TODO: validate_profile() method to check whether the passed text is valid AWS profile
+# TODO: implement __setattr__()
 if __name__ == '__main__':
     raise SystemExit(main())
