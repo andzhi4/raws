@@ -40,7 +40,8 @@ jobs:
           echo "Using pypi token: " $PYPI_API_TOKEN
     - name: Publish package
       env: 
-        PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
       uses: pypa/gh-action-pypi-publish@v1.6.4
       with:
-        password: $PYPI_API_TOKEN
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          verbose: true
