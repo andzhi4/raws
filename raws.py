@@ -13,6 +13,8 @@ A simple tool for AWS profiles management
 TODO: add .aws/config manipulation:
         raws config <profile> <option> <value>
 """
+
+
 # Env variable init to reference the credentials file
 DEFAULT_CREDS_LOCATION = os.path.join(os.path.expanduser('~'), '.aws', 'credentials')
 if 'AWS_CREDS_FILE' not in os.environ\
@@ -95,7 +97,7 @@ class AWSCredentials():
 
     def __init__(self, creds_file: str = os.environ['AWS_CREDS_FILE']) -> None:
         self.creds_file = creds_file
-        self.profiles = self._get_profiles_from_creds()
+        self.profiles = self._get_profiles_from_creds_file()
 
     def __contains__(self, item: str) -> bool:
         return item in self.profiles
@@ -121,7 +123,11 @@ class AWSCredentials():
                 setattr(current_profile, field_name, field_value)
         return current_profile
 
-    def _get_profiles_from_creds(self) -> dict[str, AWSProfile]:
+    def _get_profiles_from_creds_file(self) -> dict[str, AWSProfile]:
+
+        if not os.path.exists(self.creds_file):
+            with open(self.creds_file, 'w', encoding='utf-8'):
+                return dict()
 
         existing_profiles: dict[str, AWSProfile] = {}
         current_profile: Optional[AWSProfile] = None
@@ -139,6 +145,10 @@ class AWSCredentials():
                         collected_lines.append(line)
                     else:
                         collected_lines.append(line)
+
+            if len(collected_lines) == 0:
+                return dict()
+
             # Last profile
             current_profile = self._build_profile(collected_lines)
             existing_profiles[current_profile.profile_name] = current_profile
