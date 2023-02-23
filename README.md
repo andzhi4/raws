@@ -30,6 +30,8 @@ This will display a list of available commands:
 * `rename`: Rename a profile
 * `backup`: backup credentials file (optionally provide location)
 * `restore`: restore from a location or from latest backup
+* `version`: show current version and exit
+
 
 ## Examples
 
