@@ -1,11 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
-import fnmatch
-import shutil
 from typing import Optional
 import argparse
+import configparser
+import fnmatch
 import os
+import shutil
 import subprocess
 
 """
@@ -288,9 +289,16 @@ class AWSCredentials():
 
 
 def main() -> int:
+    # Config init
+    config = configparser.ConfigParser()
+    config.read('setup.cfg')
+    name = config['metadata']['name']
+    version = config['metadata']['version']
+    description = config['metadata']['description']
+
     # Create the parser
     parser = argparse.ArgumentParser(
-        description='Manage profiles in AWS credentials file')
+        description=description)
     parser.add_argument('--creds_file', type=str,
                         required=False, default=os.environ['AWS_CREDS_FILE'],
                         help='Override credentials file location')
@@ -350,6 +358,10 @@ def main() -> int:
     rename_parser.add_argument('from_', type=str, help='Source profile name')
     rename_parser.add_argument('to_', type=str, help='Target profile name')
 
+    # Add "version" command
+    version_parser = subparsers.add_parser('version', aliases=['ver', 'v'],
+                                           help='Show current version and exit')
+
     # Parse the arguments and call the appropriate methods
     args = parser.parse_args()
     local_profiles = AWSCredentials(args.creds_file)
@@ -396,6 +408,9 @@ def main() -> int:
             result = local_profiles.rename(args.from_, args.to_)
             local_profiles.save()
             print(f'Renamed: {result}')
+
+        elif args.command in ('version', 'ver', 'v'):
+            print(f'{name}, version: {version}')
 
     except ProfileError as e:
         print(e.message)
