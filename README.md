@@ -12,7 +12,10 @@ git clone git@github.com:andzhi4/raws
 cd raws && pip install .
 ```
 
-Installation trough PyPi is on the way
+Using PyPi:
+```shell
+pip install rawscli
+```
 
 This will display a list of available commands:
 `raws -h`
