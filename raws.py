@@ -359,7 +359,7 @@ def main() -> int:
     rename_parser.add_argument('to_', type=str, help='Target profile name')
 
     # Add "version" command
-    version_parser = subparsers.add_parser('version', aliases=['ver', 'v'],
+    version_parser = subparsers.add_parser('version', aliases=['ver', 'v'],   # noqa: F841
                                            help='Show current version and exit')
 
     # Parse the arguments and call the appropriate methods
