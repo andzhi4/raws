@@ -1,7 +1,8 @@
-from raws import AWSProfile, AWSCredentials
+from raws import AWSProfile, AWSCredentials, VERSION
 import os
 import pytest
 import shutil
+import configparser
 
 
 @pytest.fixture(scope='session')
@@ -105,5 +106,11 @@ def test_AWSCredentials_dunder(sample_creds):
     assert len(sample_creds) == 1
     assert sample_creds['some-funny-guy'].profile_name == 'some-funny-guy'
     assert 'some-funny-guy' in sample_creds
+
+def test_correct_version():
+    config = configparser.ConfigParser()
+    config.read('setup.cfg')
+    config_version = config['metadata']['version']
+    assert config_version == VERSION
 
 # TODO: add tests for the CLI part

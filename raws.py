@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 import argparse
-import configparser
 import fnmatch
 import os
 import shutil
@@ -14,6 +13,11 @@ A simple tool for AWS profiles management
 TODO: add .aws/config manipulation:
         raws config <profile> <option> <value>
 """
+
+# Version info
+NAME = 'raws'
+VERSION = '0.9.5'
+DESCRIPTION = 'A simple tool to manage your AWS credentials'
 
 
 # Env variable init to reference the credentials file
@@ -289,16 +293,9 @@ class AWSCredentials():
 
 
 def main() -> int:
-    # Config init
-    config = configparser.ConfigParser()
-    config.read(os.path.join('config', 'version_info.cfg'))
-    name = config['metadata']['name']
-    version = config['metadata']['version']
-    description = config['metadata']['description']
-
     # Create the parser
     parser = argparse.ArgumentParser(
-        description=description)
+        description=DESCRIPTION)
     parser.add_argument('--creds_file', type=str,
                         required=False, default=os.environ['AWS_CREDS_FILE'],
                         help='Override credentials file location')
@@ -410,7 +407,7 @@ def main() -> int:
             print(f'Renamed: {result}')
 
         elif args.command in ('version', 'ver', 'v'):
-            print(f'{name}, version: {version}')
+            print(f'{NAME}, version: {VERSION}')
 
     except ProfileError as e:
         print(e.message)
