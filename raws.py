@@ -291,11 +291,11 @@ class AWSCredentials():
 def main() -> int:
     # Config init
     config = configparser.ConfigParser()
-    config.read('setup.cfg')
+    config.read('raws.cfg')
     name = config['metadata']['name']
     version = config['metadata']['version']
     description = config['metadata']['description']
-
+    
     # Create the parser
     parser = argparse.ArgumentParser(
         description=description)
