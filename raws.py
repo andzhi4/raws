@@ -5,8 +5,8 @@ from typing import Optional
 import argparse
 import fnmatch
 import os
+import pyperclip  # type: ignore
 import shutil
-import subprocess
 
 """
 A simple tool for AWS profiles management
@@ -160,7 +160,7 @@ class AWSCredentials():
             return existing_profiles
 
     def _get_profile_from_clipboard(self) -> AWSProfile:
-        clipboard_text = subprocess.check_output(['pbpaste',]).decode('utf-8')
+        clipboard_text = pyperclip.paste()
         if 'aws_access_key_id' not in clipboard_text:
             raise ValueError('AWS Access Key is not in the clipboard')
         lines = clipboard_text.split('\n')
@@ -418,5 +418,6 @@ def main() -> int:
 
 # TODO: validate_profile() method to check whether the passed text is valid AWS profile
 # TODO: implement __setattr__()
+# TODO: add stubs for pyperclip
 if __name__ == '__main__':
     raise SystemExit(main())
