@@ -16,7 +16,7 @@ TODO: add .aws/config manipulation:
 
 # Version info
 NAME = 'raws'
-VERSION = '0.9.6'
+VERSION = '0.9.6.1'
 DESCRIPTION = 'A simple tool to manage your AWS credentials'
 
 
