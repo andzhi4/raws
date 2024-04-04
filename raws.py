@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Iterable, Optional
 import argparse
 import fnmatch
 import os
@@ -16,7 +16,7 @@ TODO: add .aws/config manipulation:
 
 # Version info
 NAME = 'raws'
-VERSION = '0.9.6.1'
+VERSION = '0.9.7'
 DESCRIPTION = 'A simple tool to manage your AWS credentials'
 
 
@@ -113,7 +113,7 @@ class AWSCredentials():
     def __len__(self) -> int:
         return len(self.profiles)
 
-    def _build_profile(self, profile_txt: list[str]) -> AWSProfile:
+    def _build_profile(self, profile_txt: Iterable[str]) -> AWSProfile:
         for line in profile_txt:
             if line.startswith('[') and line.endswith(']'):  # found another profile
                 profile_name = line.strip('[]')
@@ -163,7 +163,7 @@ class AWSCredentials():
         clipboard_text = pyperclip.paste()
         if 'aws_access_key_id' not in clipboard_text:
             raise ValueError('AWS Access Key is not in the clipboard')
-        lines = clipboard_text.split('\n')
+        lines = map(lambda x: x.strip('\r\n'), clipboard_text.split('\n'))
         prof = self._build_profile(lines)
         return prof
 
